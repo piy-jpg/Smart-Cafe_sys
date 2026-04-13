@@ -17,6 +17,12 @@ const sqliteStoragePath = process.env.SQLITE_STORAGE_PATH
   ? path.resolve(process.cwd(), process.env.SQLITE_STORAGE_PATH)
   : path.resolve(__dirname, '../smart_cafe.sqlite');
 
+// Vercel's serverless bundling can miss sqlite3 because Sequelize loads it dynamically.
+// Requiring it explicitly ensures the sqlite driver is traced into the deployment.
+if (dialect === 'sqlite') {
+  require('sqlite3');
+}
+
 const mysqlDialectOptions = process.env.DB_SSL === 'true'
   ? {
       ssl: {
