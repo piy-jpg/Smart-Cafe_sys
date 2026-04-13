@@ -1,0 +1,21 @@
+{
+  "name": "smart-cafe",
+  "version": "1.0.0",
+  "description": "Smart Cafe System",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && node server.js",
+    "frontend": "cd frontend && npm run dev",
+    "build": "npm --prefix frontend run build",
+    "smoke": "node scripts/smokeCheck.js",
+    "backup:data": "node backend/scripts/backupCurrentData.js",
+    "import:legacy": "node backend/scripts/importLegacyData.js",
+    "menu:expand": "node backend/scripts/addExpandedMenu.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
