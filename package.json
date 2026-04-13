@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Smart Cafe System",
   "main": "index.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "concurrently \"npm run backend\" \"npm run frontend\"",
     "backend": "cd backend && node server.js",
