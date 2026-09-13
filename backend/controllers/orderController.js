@@ -40,6 +40,15 @@ exports.createOrder = async (req, res) => {
     
     // items should be an array of { menu_id, quantity }
 
+    // Validate waiter_id exists to prevent foreign key constraint violations
+    let validWaiterId = null;
+    if (waiter_id) {
+      const waiter = await User.findByPk(waiter_id);
+      if (waiter) {
+        validWaiterId = waiter.id;
+      }
+    }
+
     const order = await Order.create({
       table_number,
       table_label: table_label || null,
@@ -48,7 +57,7 @@ exports.createOrder = async (req, res) => {
       customer_phone: customer_phone || null,
       table_cleared: false,
       status: 'pending',
-      waiter_id: waiter_id || null
+      waiter_id: validWaiterId
     });
 
     for (let item of items) {
@@ -83,8 +92,8 @@ exports.createOrder = async (req, res) => {
 
     res.status(201).json({ success: true, order: completeOrder });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Failed to create order' });
+    console.error('Error creating order:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create order' });
   }
 };
 
@@ -261,15 +270,16 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    const normalizedStatus = status === 'ready_for_billing' ? 'waiting_bill' : status;
     const now = new Date();
     const wasCancelled = order.status === 'cancelled';
-    order.status = status;
-    if (status !== 'completed' && status !== 'cancelled') {
+    order.status = normalizedStatus;
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'cancelled') {
       order.table_cleared = false;
     }
-    if (status === 'preparing' && !order.preparing_at) order.preparing_at = now;
-    if (status === 'ready' && !order.ready_at) order.ready_at = now;
-    if (status === 'served') {
+    if (normalizedStatus === 'preparing' && !order.preparing_at) order.preparing_at = now;
+    if (normalizedStatus === 'ready' && !order.ready_at) order.ready_at = now;
+    if (normalizedStatus === 'served') {
       if (!order.preparing_at) order.preparing_at = now;
       if (!order.ready_at) order.ready_at = now;
       order.served_at = now;
@@ -277,31 +287,33 @@ exports.updateOrderStatus = async (req, res) => {
         order.handover_target = handover_target || null;
       }
     }
-    if (status === 'waiting_bill') {
+    if (normalizedStatus === 'waiting_bill') {
       if (!order.preparing_at) order.preparing_at = now;
       if (!order.ready_at) order.ready_at = now;
       if (!order.served_at) order.served_at = now;
       order.payment_received = false;
       order.payment_status = 'pending';
       order.payment_recorded_at = null;
+      order.table_cleared = false;
     }
-    if (status === 'completed') {
+    if (normalizedStatus === 'completed') {
       if (!order.preparing_at) order.preparing_at = now;
       if (!order.ready_at) order.ready_at = now;
       if (!order.served_at) order.served_at = now;
       order.payment_received = true;
       order.payment_status = 'paid';
+      order.table_cleared = true;
       if (!order.payment_recorded_at) order.payment_recorded_at = now;
     }
-    if (status === 'cancelled') {
+    if (normalizedStatus === 'cancelled') {
       order.cancelled_at = now;
     }
-    if (status !== 'served' && handover_target !== undefined) {
+    if (normalizedStatus !== 'served' && handover_target !== undefined) {
       order.handover_target = handover_target || null;
     }
     await order.save();
 
-    if (status === 'cancelled' && !wasCancelled) {
+    if (normalizedStatus === 'cancelled' && !wasCancelled) {
       await restockCancelledItems(id);
     }
 
@@ -313,6 +325,9 @@ exports.updateOrderStatus = async (req, res) => {
         ...updatedOrder.toJSON(),
         update_type: 'status_changed'
       });
+      if (normalizedStatus === 'completed') {
+        req.io.emit('tableCleared', updatedOrder);
+      }
       req.io.emit('menuUpdated');
     }
 
@@ -320,6 +335,84 @@ exports.updateOrderStatus = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to update order status' });
+  }
+};
+
+exports.settleFinalBill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { payment_method = 'cash', discount_amount = 0 } = req.body;
+
+    let order = await Order.findByPk(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const now = new Date();
+    if (!order.preparing_at) order.preparing_at = now;
+    if (!order.ready_at) order.ready_at = now;
+    if (!order.served_at) order.served_at = now;
+
+    order.status = 'completed';
+    order.payment_received = true;
+    order.payment_status = 'paid';
+    order.payment_method = payment_method;
+    order.discount_amount = Number(discount_amount || 0);
+    order.payment_recorded_at = now;
+    order.table_cleared = true;
+
+    await order.save();
+
+    const updatedOrder = await loadOrderWithRelations(id);
+
+    if (req.io) {
+      req.io.emit('orderStatusUpdated', updatedOrder);
+      req.io.emit('orderUpdated', {
+        ...updatedOrder.toJSON(),
+        update_type: 'final_bill_settled'
+      });
+      req.io.emit('orderCustomerUpdated', updatedOrder);
+      req.io.emit('tableCleared', updatedOrder);
+      req.io.emit('menuUpdated');
+    }
+
+    res.json({ success: true, order: updatedOrder });
+  } catch (error) {
+    console.error('Failed to settle final bill:', error);
+    res.status(500).json({ success: false, message: 'Failed to settle final bill' });
+  }
+};
+
+exports.returnToWaiter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let order = await Order.findByPk(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.status = 'served';
+    order.payment_received = false;
+    order.payment_status = 'pending';
+    order.table_cleared = false;
+
+    await order.save();
+
+    const updatedOrder = await loadOrderWithRelations(id);
+
+    if (req.io) {
+      req.io.emit('orderStatusUpdated', updatedOrder);
+      req.io.emit('orderUpdated', {
+        ...updatedOrder.toJSON(),
+        update_type: 'returned_to_waiter'
+      });
+      req.io.emit('orderCustomerUpdated', updatedOrder);
+    }
+
+    res.json({ success: true, order: updatedOrder });
+  } catch (error) {
+    console.error('Failed to return table to waiter:', error);
+    res.status(500).json({ success: false, message: 'Failed to return table to waiter' });
   }
 };
 

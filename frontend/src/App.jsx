@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import WaiterDashboard from './pages/WaiterDashboard';
+import WaiterDashboardNew from './pages/WaiterDashboardNew';
 import KitchenDashboard from './pages/KitchenDashboard';
 import ManagerDashboard from './pages/ManagerDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import PublicOrderPage from './pages/PublicOrderPage';
-import { Typography, Button, IconButton, TextField, Alert } from '@mui/material';
+import { Typography, Button, IconButton, TextField, Alert, Tooltip } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { API_BASE_URL } from './lib/appConfig';
 import { canAccessRoute, clearSession, getAllowedRoutesForRole, getDefaultRouteForRole, getStoredUser, storeSession } from './lib/session';
 
@@ -18,13 +19,13 @@ const NavbarLinks = ({ navItems, onNavigate }) => (
       <NavLink
         key={item.path}
         to={item.path}
-        className={({ isActive }) => (
-          `whitespace-nowrap rounded-full px-4 py-2 font-semibold transition-all md:py-2 ${
+        className={({ isActive }) =>
+          `whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
             isActive
-              ? 'bg-slate-900 text-white shadow-sm'
-              : `text-slate-700 ${item.classes}`
+              ? 'bg-slate-800 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
           }`
-        )}
+        }
         onClick={onNavigate}
       >
         {item.label}
@@ -44,12 +45,13 @@ const Navbar = () => {
   
   if (location.pathname === '/' || location.pathname === '/order') return null;
   if (!role || !allowedRoutes.length) return null;
+  if (!hasMultipleDashboards && (location.pathname === '/waiter' || location.pathname === '/kitchen')) return null;
 
   const navItems = [
-    { path: '/waiter', label: 'Waiter Dashboard', classes: 'hover:bg-indigo-50 hover:text-indigo-700' },
-    { path: '/kitchen', label: 'Chef Dashboard', classes: 'hover:bg-amber-50 hover:text-amber-700' },
-    { path: '/manager', label: 'Manager Dashboard', classes: 'hover:bg-emerald-50 hover:text-emerald-700' },
-    { path: '/owner', label: 'Owner Dashboard', classes: 'hover:bg-slate-100 hover:text-slate-900' }
+    { path: '/waiter', label: 'Waiter' },
+    { path: '/kitchen', label: 'Chef' },
+    { path: '/manager', label: 'Manager' },
+    { path: '/owner', label: 'Owner' }
   ].filter((item) => allowedRoutes.includes(item.path));
 
   const roleLabel = role === 'chef'
@@ -60,71 +62,111 @@ const Navbar = () => {
         ? 'Owner'
         : 'Waiter';
 
+  const roleInitial = roleLabel.charAt(0);
+
+  const handleLogout = () => {
+    setMobileOpen(false);
+    clearSession();
+    navigate('/');
+  };
+
   return (
-    <nav className="sticky top-0 z-[80] border-b border-slate-200/80 bg-white/92 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.34)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-4 md:gap-4 md:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 text-sm font-black text-white shadow-lg">
+    <nav className="sticky top-0 z-[80] border-b border-slate-200/60 bg-white/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 md:px-6">
+        
+        {/* Logo */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 text-xs font-black text-white shadow-md">
             SC
           </div>
-          <div className="min-w-0">
-            <Typography variant="h6" className="font-black tracking-tight text-slate-900">SmartCafe</Typography>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Operations Suite</p>
-          </div>
+          <span className="text-lg font-bold tracking-tight text-slate-900">SmartCafe</span>
         </div>
         
-        {/* Desktop Links */}
+        {/* Desktop Nav Pills */}
         {hasMultipleDashboards ? (
-          <div className="hidden min-w-0 flex-1 items-center justify-center lg:flex">
-            <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto rounded-full border border-slate-200 bg-slate-50/90 p-1.5 scrollbar-thin">
-            <NavbarLinks navItems={navItems} onNavigate={() => setMobileOpen(false)} />
+          <div className="hidden flex-1 items-center justify-center lg:flex">
+            <div className="flex items-center gap-1 rounded-full border border-slate-100 bg-slate-50/60 p-1">
+              <NavbarLinks navItems={navItems} onNavigate={() => setMobileOpen(false)} />
             </div>
           </div>
         ) : (
-          <div className="hidden rounded-full border border-slate-200 bg-slate-50/90 px-4 py-2 text-sm font-bold uppercase tracking-[0.22em] text-slate-500 lg:flex">
-            {roleLabel}
+          <div className="hidden flex-1 items-center justify-center lg:flex">
+            <div className="rounded-full border border-slate-100 bg-slate-50/60 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+              {roleLabel}
+            </div>
           </div>
         )}
 
-        {/* Desktop Logout & Mobile Toggle */}
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outlined" 
-            color="inherit"
-            className="hidden rounded-full border-slate-300 text-slate-700 lg:flex"
-            onClick={() => {
-              clearSession();
-              navigate('/');
-            }}
-          >
-            Logout
-          </Button>
+        {/* Right: User Info + Logout + Mobile Toggle */}
+        <div className="flex items-center gap-2.5">
+          {/* User avatar + role label */}
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-400 text-xs font-bold text-white shadow-sm">
+              {roleInitial}
+            </div>
+            <span className="hidden text-sm font-semibold text-slate-600 lg:block">{roleLabel}</span>
+          </div>
+
+          {/* Desktop Logout Icon */}
+          <Tooltip title="Logout" arrow>
+            <IconButton
+              size="small"
+              className="hidden text-slate-400 hover:bg-red-50 hover:text-red-500 lg:flex"
+              onClick={handleLogout}
+            >
+              <LogoutIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           
+          {/* Mobile Menu Toggle */}
           {hasMultipleDashboards ? (
-            <IconButton color="inherit" className="shrink-0 border border-slate-200 bg-white text-slate-700 lg:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+            <IconButton
+              size="small"
+              className="shrink-0 text-slate-500 lg:hidden"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
               {mobileOpen ? <CloseIcon /> : <MenuIcon />}
             </IconButton>
-          ) : null}
+          ) : (
+            /* Mobile Logout for single-dashboard roles */
+            <Tooltip title="Logout" arrow>
+              <IconButton
+                size="small"
+                className="text-slate-400 hover:bg-red-50 hover:text-red-500 lg:hidden"
+                onClick={handleLogout}
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </div>
       </div>
 
       {/* Mobile Drawer */}
-      <div className={`overflow-hidden border-t border-slate-200/70 bg-white/96 shadow-lg backdrop-blur-xl transition-all duration-300 ease-in-out lg:hidden ${hasMultipleDashboards && mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-        <div className="flex flex-col gap-2 px-4 py-4">
+      <div className={`overflow-hidden border-t border-slate-100 bg-white/95 backdrop-blur-xl transition-all duration-300 ease-in-out lg:hidden ${hasMultipleDashboards && mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 border-t-0 opacity-0'}`}>
+        <div className="flex flex-col gap-1.5 px-4 py-4">
+          {/* Mobile user header */}
+          <div className="mb-2 flex items-center gap-2.5 border-b border-slate-100 pb-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-400 text-sm font-bold text-white shadow-sm">
+              {roleInitial}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-700">{user?.name || roleLabel}</p>
+              <p className="text-xs text-slate-400">{roleLabel}</p>
+            </div>
+          </div>
+
+          {/* Mobile nav links */}
           <NavbarLinks navItems={navItems} onNavigate={() => setMobileOpen(false)} />
-          <Button 
-            variant="outlined" 
-            color="inherit"
-            fullWidth
-            className="mt-4 rounded-full border-slate-300 text-slate-700"
-            onClick={() => {
-              setMobileOpen(false);
-              clearSession();
-              navigate('/');
-            }}
+          
+          {/* Mobile Logout */}
+          <button
+            className="mt-3 flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            onClick={handleLogout}
           >
+            <LogoutIcon fontSize="small" />
             Logout
-          </Button>
+          </button>
         </div>
       </div>
     </nav>
@@ -277,7 +319,7 @@ function App() {
         <main className="flex-1 flex flex-col relative">
           <Routes>
             <Route path="/" element={<HomeRoute />} />
-            <Route path="/waiter" element={<ProtectedRoute path="/waiter"><WaiterDashboard /></ProtectedRoute>} />
+            <Route path="/waiter" element={<ProtectedRoute path="/waiter"><WaiterDashboardNew /></ProtectedRoute>} />
             <Route path="/kitchen" element={<ProtectedRoute path="/kitchen"><KitchenDashboard /></ProtectedRoute>} />
             <Route path="/manager" element={<ProtectedRoute path="/manager"><ManagerDashboard /></ProtectedRoute>} />
             <Route path="/owner" element={<ProtectedRoute path="/owner"><OwnerDashboard /></ProtectedRoute>} />

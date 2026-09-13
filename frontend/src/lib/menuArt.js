@@ -40,9 +40,7 @@ const getInitials = (name) => (
     .toUpperCase()
 );
 
-export const getMenuImage = (item) => {
-  if (item?.image_url) return item.image_url;
-
+export const getFallbackMenuArt = (item) => {
   const category = sanitizeLabel(item?.category, 'Cafe Special');
   const name = sanitizeLabel(item?.name, 'House Item');
   const theme = CATEGORY_THEMES[category] || DEFAULT_THEME;
@@ -77,4 +75,9 @@ export const getMenuImage = (item) => {
   `;
 
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
+export const getMenuImage = (item) => {
+  if (item?.image_url) return item.image_url;
+  return getFallbackMenuArt(item);
 };

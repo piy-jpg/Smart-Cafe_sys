@@ -23,6 +23,10 @@ const Menu = sequelize.define('Menu', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   item_type: {
     type: DataTypes.STRING(20),
     allowNull: false,

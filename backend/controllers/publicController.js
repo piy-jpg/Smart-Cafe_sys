@@ -273,20 +273,31 @@ exports.getPublicOrderStatus = async (req, res) => {
 exports.getTableQrCodes = async (req, res) => {
   try {
     const restaurantCode = String(req.query.restaurant || req.query.res || PUBLIC_RESTAURANT_CODE).trim();
+    const specificTable = Number(req.query.table || 0);
     const tableCount = Math.max(1, Math.min(50, Number(req.query.tables || 10)));
+    const startTable = Math.max(1, Number(req.query.start || 1));
+    const qrWidth = Math.max(160, Math.min(600, Number(req.query.width || req.query.size || 280)));
 
     if (!isValidRestaurant(restaurantCode)) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
     const baseUrl = resolvePublicAppUrl(req);
+
+    let tableNumbers = [];
+    if (specificTable > 0) {
+      tableNumbers = [specificTable];
+    } else {
+      const count = Math.min(50, tableCount);
+      tableNumbers = Array.from({ length: count }, (_, i) => startTable + i);
+    }
+
     const tables = await Promise.all(
-      Array.from({ length: tableCount }, async (_, index) => {
-        const tableNumber = index + 1;
+      tableNumbers.map(async (tableNumber) => {
         const url = `${baseUrl}/order?res=${encodeURIComponent(restaurantCode)}&table=${tableNumber}`;
         const qrImage = await QRCode.toDataURL(url, {
           margin: 1,
-          width: 280
+          width: qrWidth
         });
 
         return {
@@ -297,7 +308,7 @@ exports.getTableQrCodes = async (req, res) => {
       })
     );
 
-    res.json({ success: true, tables, restaurantCode });
+    res.json({ success: true, tables, restaurantCode, baseUrl });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to generate table QR codes' });

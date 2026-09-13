@@ -22,3 +22,5 @@ backend/mysql-local/
 backend/backups/
 backend/data/
 .vercel
+NIDS_sys/
+spendly/

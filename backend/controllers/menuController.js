@@ -13,7 +13,7 @@ exports.getMenu = async (req, res) => {
 
 exports.addMenuItem = async (req, res) => {
   try {
-    const { name, price, category, image_url, item_type, stock_quantity, total_received } = req.body;
+    const { name, price, category, image_url, item_type, stock_quantity, total_received, description } = req.body;
     const initialStock = Number(stock_quantity || 0);
     const receivedTotal = Number(total_received ?? initialStock);
     const newItem = await Menu.create({
@@ -21,6 +21,7 @@ exports.addMenuItem = async (req, res) => {
       price,
       category,
       image_url: image_url || null,
+      description: description || null,
       item_type: item_type || 'Veg',
       stock_quantity: initialStock,
       total_received: receivedTotal,
@@ -39,7 +40,7 @@ exports.addMenuItem = async (req, res) => {
 exports.updateMenuItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, category, image_url, item_type, available, stock_quantity, total_received, restock_quantity } = req.body;
+    const { name, price, category, image_url, description, item_type, available, stock_quantity, total_received, restock_quantity } = req.body;
     
     let item = await Menu.findByPk(id);
     if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
@@ -48,6 +49,7 @@ exports.updateMenuItem = async (req, res) => {
     if (price !== undefined) item.price = price;
     if (category !== undefined) item.category = category;
     if (image_url !== undefined) item.image_url = image_url || null;
+    if (description !== undefined) item.description = description || null;
     if (item_type !== undefined) item.item_type = item_type || 'Veg';
     if (stock_quantity !== undefined) item.stock_quantity = Number(stock_quantity);
     if (total_received !== undefined) item.total_received = Number(total_received);

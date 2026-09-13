@@ -11,7 +11,8 @@
     "backup:data": "node scripts/backupCurrentData.js",
     "import:legacy": "node scripts/importLegacyData.js",
     "menu:expand": "node scripts/addExpandedMenu.js",
-    "menu:compact": "node scripts/setCompactMenu.js"
+    "menu:compact": "node scripts/setCompactMenu.js",
+    "menu:seed100": "node scripts/seed100MenuItems.js"
   },
   "keywords": [],
   "author": "",

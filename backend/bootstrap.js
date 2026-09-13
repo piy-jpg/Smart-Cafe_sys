@@ -64,6 +64,15 @@ const ensureOrderHistoryColumns = async () => {
   }
 
   try {
+    await sequelize.query('ALTER TABLE menu ADD COLUMN description TEXT');
+    console.log('Menu table updated with description');
+  } catch (error) {
+    if (!isDuplicateColumnError(error)) {
+      console.error('Error ensuring menu.description column:', error.message);
+    }
+  }
+
+  try {
     await sequelize.query(`
       UPDATE menu
       SET stock_quantity = CASE
@@ -398,12 +407,35 @@ const ensureOrderHistoryColumns = async () => {
   }
 };
 
+const ensureDefaultUsers = async () => {
+  try {
+    const User = require('./models/User');
+    const defaultUsers = [
+      { id: 1, name: 'Demo Waiter', email: 'demo@waiter.com', password: 'demo', role: 'waiter' },
+      { id: 2, name: 'Demo Chef', email: 'demo@chef.com', password: 'demo', role: 'chef' },
+      { id: 3, name: 'Demo Manager', email: 'demo@manager.com', password: 'demo', role: 'manager' },
+      { id: 4, name: 'Demo Owner', email: 'demo@owner.com', password: 'demo', role: 'owner' }
+    ];
+
+    for (const u of defaultUsers) {
+      const existing = await User.findByPk(u.id);
+      if (!existing) {
+        await User.create(u);
+      }
+    }
+    console.log('Default demo users verified in database');
+  } catch (error) {
+    console.error('Error ensuring default users:', error.message);
+  }
+};
+
 const bootstrap = async () => {
   if (!bootstrapPromise) {
     bootstrapPromise = (async () => {
       await connectDB();
       await sequelize.sync({ force: false });
       await ensureOrderHistoryColumns();
+      await ensureDefaultUsers();
       console.log('Database synced');
     })().catch((error) => {
       bootstrapPromise = null;

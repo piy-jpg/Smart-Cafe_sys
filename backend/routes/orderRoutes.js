@@ -1,6 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { createOrder, addItemsToOrder, getOrders, updateOrderStatus, updateOrderCustomer, recordBillPrint, getAnalytics, updateOrderOwnerControls, updateOrderTableClearState } = require('../controllers/orderController');
+const {
+  createOrder,
+  addItemsToOrder,
+  getOrders,
+  updateOrderStatus,
+  updateOrderCustomer,
+  recordBillPrint,
+  getAnalytics,
+  updateOrderOwnerControls,
+  updateOrderTableClearState,
+  settleFinalBill,
+  returnToWaiter
+} = require('../controllers/orderController');
 
 router.get('/analytics', getAnalytics);
 router.post('/', createOrder);
@@ -11,5 +23,7 @@ router.put('/:id/bill-print', recordBillPrint);
 router.put('/:id/owner-controls', updateOrderOwnerControls);
 router.put('/:id/table-clear', updateOrderTableClearState);
 router.put('/:id/status', updateOrderStatus);
+router.post('/:id/settle-bill', settleFinalBill);
+router.post('/:id/return-to-waiter', returnToWaiter);
 
 module.exports = router;
