@@ -19,3 +19,5 @@ frontend/dist
 backend/mysql-local
 backend/backups
 backend/data
+NIDS_sys
+spendly
